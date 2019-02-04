@@ -1,5 +1,3 @@
-import java.io.DataInput;
-import java.io.DataOutput;
 import java.io.File;
 import java.io.IOException;
 import java.util.StringTokenizer;
@@ -9,11 +7,12 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.Reducer.Context;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.GenericOptionsParser;
@@ -21,25 +20,30 @@ import org.apache.hadoop.util.GenericOptionsParser;
 @SuppressWarnings("unused")
 public class Play {
 	
-	public static class TokenizerMapper extends Mapper<Object, JonText, JonText, IntWritable> {
+	public static class TokenizerMapper extends Mapper<Object, Text, TextPair, IntWritable>{
 		private final static IntWritable one = new IntWritable(1);
-		private JonText word = new JonText();
-
-		public void map(Object key, JonText value, Context context) throws IOException, InterruptedException {
+		private TextPair word = new TextPair();
+		private TextPair count = new TextPair("zzzzz", "zzzzz");
+		
+		public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
 			StringTokenizer itr = new StringTokenizer(value.toString());
 			while (itr.hasMoreTokens()) {
-				word.set(itr.nextToken());
+				word.setA(itr.nextToken());
+				word.setB(word.getA());
 				context.write(word, one);
 			}
+			context.write(count, one);	
 		}
 	}
 	
-	public static class IntSumReducer extends Reducer<JonText, IntWritable, JonText, IntWritable> {
-		private IntWritable result = new IntWritable();
-				
-		public void reduce(JonText key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
-			int sum = StreamSupport.stream(values.spliterator(), false).mapToInt(x->x.get()).sum();
-			result.set(sum);
+	public static class IntSumReducer extends Reducer<TextPair, IntWritable, TextPair, IntPair> {
+		private IntPair result = new IntPair();
+		
+		public void reduce(TextPair key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
+			int sum = 0;
+			for (IntWritable val : values)
+				sum += val.get();
+			result.set(sum, sum);
 			context.write(key, result);
 		}
 	}
@@ -62,34 +66,14 @@ public class Play {
 		FileUtils.deleteDirectory(new File(otherArgs[1]));
 		Job job = Job.getInstance(conf, "word count");
 		job.setJarByClass(Play.class);
-		job.setMapperClass(TokenizerMapper.class);
-		job.setCombinerClass(IntSumReducer.class);
-		job.setReducerClass(IntSumReducer.class);
-		job.setOutputKeyClass(JonText.class);
-		job.setOutputValueClass(IntWritable.class);
+        job.setMapperClass(TokenizerMapper.class);
+        job.setReducerClass(IntSumReducer.class);
+ 
+        job.setMapOutputKeyClass(TextPair.class);
+        job.setMapOutputValueClass(IntWritable.class);
+ 
+        job.setOutputKeyClass(TextPair.class);
+        job.setOutputValueClass(IntPair.class);
 		return job;
 	}
-}
-
-class JonText implements WritableComparable<JonText> {
-	private String s;
-	
-	JonText() { this.s = null; }
-	JonText(String str) { this.s = str; }
-	
-	void set(String str) { this.s = str; }
-	String get() { return s; }
-
-	public void write(DataOutput out) throws IOException {
-		out.writeChars(s);
-	}
-	
-	public void readFields(DataInput in) throws IOException {
-		s = in.readLine();
-	}
-
-	public int compareTo(JonText o) {
-		return s.compareTo(o.get());
-	}
-
 }
