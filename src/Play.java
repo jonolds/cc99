@@ -25,10 +25,10 @@ import org.apache.hadoop.util.GenericOptionsParser;
 public class Play {
 	static final String DELIM = "*-*-*";
 	
-	public static class TokenizerMapper extends Mapper<Object, TextX, TextX, IntWritable> {
+	public static class TokenizerMapper extends Mapper<Object, Text, TextX, IntWritable> {
 		private final static IntWritable one = new IntWritable(1);
 		
-		public void map(Object key, TextX value, Context context) throws IOException, InterruptedException {
+		public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
 			context.write(new TextX(DELIM+"Word Count: "), one);
 			
 			StringTokenizer itr = new StringTokenizer(value.toString());
@@ -99,7 +99,9 @@ public class Play {
 		
 		public TextX(String a) {
 			this.val = new Text(a); 
-
+		}
+		public TextX(Text t) {
+			this.val = t;
 		}
 		public TextX() { this.val = new Text(); }
 		
