@@ -21,8 +21,10 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.MultipleOutputs;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.util.GenericOptionsParser;
-
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 public class Play {
+	
 	static final String DELIM = "*-*-*";
 	
 	public static class TokenizerMapper extends Mapper<Object, Text, TextX, IntWritable> {
@@ -56,11 +58,9 @@ public class Play {
 				for (IntWritable val : values)
 					sum += Integer.parseInt(val.toString());
 				result.set(sum);
-
 				context.write(key, result);
 			}
 		}
-		
 		public void cleanup(Context context) throws IOException, InterruptedException { mos.close(); }
 	}
 	
@@ -76,6 +76,10 @@ public class Play {
 	
 	static Job init(String[] args) throws IOException {
 		Configuration conf = new Configuration();
+
+		Logger log = Logger.getLogger(Play.class);
+		log.setLevel(Level.WARN);
+		
 		String[] otherArgs = new GenericOptionsParser(conf, args).getRemainingArgs();
 		if (otherArgs.length != 2) {
 			System.err.println("Usage: wordcount <in> <out>");
@@ -85,6 +89,7 @@ public class Play {
 			Files.walk(Paths.get("output")).sorted(Comparator.reverseOrder()).forEach(x->x.toFile().delete());
 		
 		Job job = Job.getInstance(conf, "word count");
+		
 		job.setJarByClass(Play.class);
 		job.setMapperClass(TokenizerMapper.class);
 		job.setCombinerClass(IntSumReducer.class);
@@ -97,40 +102,19 @@ public class Play {
 	static class TextX implements WritableComparable<TextX> {  
 		public Text val;
 		
-		public TextX(String a) {
-			this.val = new Text(a); 
-		}
-		public TextX(Text t) {
-			this.val = t;
-		}
+		public TextX(String a) { this.val = new Text(a); }
+		public TextX(Text t) { this.val = t; }
 		public TextX() { this.val = new Text(); }
 		
-		public void set(Text t) { 
-			this.val = t;
-		}
-		public void set(String str) {
-			this.val.set(str);
-		}
+		public void set(Text t) { this.val = t; }
+		public void set(String str) { this.val.set(str); }
 		
-		public String toString() { 
-			return this.val.toString();
-		}
+		public String toString() { return this.val.toString(); }
 		
-		public void readFields(DataInput in) throws IOException { 
-			val.readFields(in);
-
-		}
-		public void write(DataOutput out) throws IOException { 
-			val.write(out); 
-
-		}
+		public void readFields(DataInput in) throws IOException { val.readFields(in); }
+		public void write(DataOutput out) throws IOException { val.write(out); }
 		
-		public int compareTo(TextX o) {
-			return val.compareTo(o.val);
-		}
-		public boolean equals(TextX o) {
-		    return val.equals(o.val);
-		}
+		public int compareTo(TextX o) { return val.compareTo(o.val); }
+		public boolean equals(TextX o) { return val.equals(o.val); }
 	}
 }
-	
