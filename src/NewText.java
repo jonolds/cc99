@@ -2,8 +2,10 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.Writable;
+import org.apache.hadoop.io.WritableComparable;
 
-public class NewText {
+public class NewText implements Writable, WritableComparable<NewText>{
 	private Text value;
 
 	public NewText(Text txt) { this.value = txt; }
@@ -11,9 +13,9 @@ public class NewText {
 	public NewText() { this.value = new Text(); }
 
 	public static NewText read(DataInput in) throws IOException {
-		NewText txtPair = new NewText();
-		txtPair.readFields(in);
-		return txtPair;
+		NewText newtext = new NewText();
+		newtext.readFields(in);
+		return newtext;
 	}
 
 	public void write(DataOutput out) throws IOException { value.write(out); }
@@ -21,8 +23,13 @@ public class NewText {
 
 	public String toString() { return "{txt=[" + value + "]"; }
 
-	public int compareTo(NewText o) { return value.compareTo(o.getWord()); }
-	public boolean equals(Object o) { return value.equals(o); }
+	public int compareTo(NewText o) { return -value.compareTo(o.getWord()); }
+	public boolean equals(Object o) {
+		if (this == o) return true;
+		if (o == null || getClass() != o.getClass()) return false;
+		NewText newtext = (NewText) o;
+		return value.equals(newtext.getWord()); 
+	}
 
 	public int hashCode() { return 163 * (value != null ? value.hashCode() : 0); }
 	public void set(String txt){ this.value.set(txt); }

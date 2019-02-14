@@ -23,31 +23,32 @@ import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.util.GenericOptionsParser;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+
 public class Play {
 	
 	static final String DELIM = "*-*-*";
 	
-	public static class TokenizerMapper extends Mapper<Object, Text, TextX, IntWritable> {
+	public static class TokenizerMapper extends Mapper<Object, Text, NewText, IntWritable> {
 		private final static IntWritable one = new IntWritable(1);
 		
 		public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
-			context.write(new TextX(DELIM+"Word Count: "), one);
+			context.write(new NewText(DELIM+"Word Count: "), one);
 			
 			StringTokenizer itr = new StringTokenizer(value.toString());
 			while (itr.hasMoreTokens())
-				context.write(new TextX(itr.nextToken()), one);
+				context.write(new NewText(itr.nextToken()), one);
 		}
 	}
 	
-	public static class IntSumReducer extends Reducer<TextX, IntWritable, TextX, IntWritable> {
+	public static class IntSumReducer extends Reducer<NewText, IntWritable, NewText, IntWritable> {
 		private IntWritable result = new IntWritable();
-		private MultipleOutputs<TextX, IntWritable> mos;
+		private MultipleOutputs<NewText, IntWritable> mos;
 		
-		public void setup(Context context) { mos = new MultipleOutputs<TextX, IntWritable>(context); 
+		public void setup(Context context) { mos = new MultipleOutputs<NewText, IntWritable>(context); 
 			System.out.println("red cleaner");
 		}
 		
-		public void reduce(TextX key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
+		public void reduce(NewText key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
 			if(key.toString().startsWith(DELIM)) {
 				int mapcount = StreamSupport.stream(values.spliterator(), false).mapToInt(x->x.get()).sum();
 				mos.write("mapCallCount", key.toString().substring(5), new IntWritable(mapcount));
@@ -69,7 +70,7 @@ public class Play {
 		
 		FileInputFormat.addInputPath(job, new Path(args[0]));
 		FileOutputFormat.setOutputPath(job, new Path(args[1]));
-		MultipleOutputs.addNamedOutput(job, "mapCallCount", TextOutputFormat.class, Play.TextX.class, IntWritable.class);
+		MultipleOutputs.addNamedOutput(job, "mapCallCount", TextOutputFormat.class, NewText.class, IntWritable.class);
 		
 		System.exit(job.waitForCompletion(true) ? 0 : 1);
 	}
@@ -94,7 +95,7 @@ public class Play {
 		job.setMapperClass(TokenizerMapper.class);
 		job.setCombinerClass(IntSumReducer.class);
 		job.setReducerClass(IntSumReducer.class);
-		job.setOutputKeyClass(Play.TextX.class);
+		job.setOutputKeyClass(NewText.class);
 		job.setOutputValueClass(IntWritable.class);
 		return job;
 	}
