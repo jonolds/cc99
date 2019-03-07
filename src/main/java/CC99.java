@@ -29,8 +29,10 @@ public class CC99 {
 		protected void map(LongWritable key, Text line, Context context) throws IOException, InterruptedException {
 			String filename = ((FileSplit) context.getInputSplit()).getPath().getName();			
 			for(String tok : line.toString().toLowerCase().split(" "))
-				if(tok.length() > 0)
+				if(tok.length() > 0) {
 					THEMAP.put(tok+DELIM+filename, THEMAP.containsKey(tok+DELIM+filename) ? THEMAP.get(tok+DELIM+filename) + 1 : 1);
+				}
+					
 		}
 		
 		protected void cleanup(Context context) throws IOException, InterruptedException {
