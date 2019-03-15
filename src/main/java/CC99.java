@@ -1,105 +1,164 @@
+import java.io.File;
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map.Entry;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.Iterator;
+import java.util.List;
+import java.util.stream.Collectors;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.Mapper;
-import org.apache.hadoop.mapreduce.Partitioner;
-import org.apache.hadoop.mapreduce.Reducer;
-import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
-import org.apache.hadoop.mapreduce.lib.input.FileSplit;
-import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
-import org.apache.hadoop.util.GenericOptionsParser;
+import org.apache.hadoop.mapred.FileInputFormat;
+import org.apache.hadoop.mapred.FileOutputFormat;
+import org.apache.hadoop.mapred.JobClient;
+import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapred.MapReduceBase;
+import org.apache.hadoop.mapred.Mapper;
+import org.apache.hadoop.mapred.OutputCollector;
+import org.apache.hadoop.mapred.Reducer;
+import org.apache.hadoop.mapred.Reporter;
+import org.apache.hadoop.mapred.RunningJob;
+import org.apache.hadoop.util.Tool;
+import org.apache.hadoop.util.ToolRunner;
 
-public class CC99 {
+/** Input is a map in adjacency list format, and performs a breadth-first search. The input format is:
+ * "ID	 EDGES|DISTANCE|COLOR"
+ * 		ID = the unique identifier for a node (assumed to be an int here)
+ * 		EDGES = the list of edges emanating from the node (e.g. 3,8,9,12)
+ * 		DISTANCE = the to be determined distance of the node from the source
+ * 		COLOR = a simple status tracking field to keep track of when we're finished with a node
+ * Source should have distance 0 and be GRAY. Others have distance Integer.MAX_VALUE and color WHITE.*/
+public class CC99 extends Configured implements Tool {
+	public static final Log LOG = LogFactory.getLog("org.apache.hadoop.examples.GraphSearch");
 	
-	public static class InvIdxMapper extends Mapper<LongWritable, Text, WPairPriority, IntWritable> {
-		HashMap<String, Integer> THEMAP;
-		static final String DELIM = "!-!-!";
-		
-		protected void setup(Context context) {
-			THEMAP = new HashMap<String, Integer>();
-		}
-		
-		protected void map(LongWritable key, Text line, Context context) throws IOException, InterruptedException {
-			String filename = ((FileSplit) context.getInputSplit()).getPath().getName();			
-			for(String tok : line.toString().toLowerCase().split(" "))
-				if(tok.length() > 0) {
-					THEMAP.put(tok+DELIM+filename, THEMAP.containsKey(tok+DELIM+filename) ? THEMAP.get(tok+DELIM+filename) + 1 : 1);
+	/** Nodes that are Color.WHITE or Color.BLACK are emitted, as is. For every
+	 * edge of a Color.GRAY node, we emit a new Node with distance incremented by
+	 * one. The Color.GRAY node is then colored black and is also emitted. */
+	public static class MapClass extends MapReduceBase implements Mapper<LongWritable, Text, IntWritable, Text> {
+		public void map(LongWritable key, Text value, OutputCollector<IntWritable, Text> output, Reporter reporter) throws IOException {
+			LOG.info("MAP EXECUTING FOR KEY [" + key.toString() + "] and value [" + value.toString() + "]");
+			Node node = new Node(value.toString());
+
+			// For each GRAY node, emit each of the edges as a new node (also GRAY)
+			if (node.getColor() == Node.Color.GRAY) {
+				for (int edge : node.getEdges()) {
+					Node vnode = new Node(edge);
+					vnode.setDistance(node.getDistance() + 1);
+					vnode.setColor(Node.Color.GRAY);
+					output.collect(new IntWritable(vnode.getId()), vnode.getLine());
 				}
-					
-		}
-		
-		protected void cleanup(Context context) throws IOException, InterruptedException {
-			for(Entry<String, Integer> e : THEMAP.entrySet()) {
-				String[] key_parts = e.getKey().split(DELIM);
-				context.write(new WPairPriority(key_parts[0], key_parts[1]), new IntWritable(e.getValue()));
+				node.setColor(Node.Color.BLACK);
 			}
+			output.collect(new IntWritable(node.getId()), node.getLine());
+			LOG.info("MAP OUTPUTTING FOR KEY [" + node.getId() + "] and value [" + node.getLine() + "]");
 		}
 	}
-	
-	public static class WORDFILEPartitioner extends Partitioner<WPairPriority, IntWritable> {
-		public int getPartition(WPairPriority key, IntWritable value, int numPartitions) {
-			return Math.abs(key.getWord().hashCode()) % numPartitions;
+
+	/** A reducer class that just emits the sum of the input values. */
+	public static class Reduce extends MapReduceBase implements Reducer<IntWritable, Text, IntWritable, Text> {
+
+		/** Make a new node which combines all information for this single node id. The Node should have
+		 * - 1)The full list of edges. 2)The minimum distance. 3)The darkest Color. */
+		public void reduce(IntWritable key, Iterator<Text> values, OutputCollector<IntWritable, Text> output, Reporter reporter) throws IOException {
+			LOG.info("REDUCE EXECUTING FOR INPUT KEY [" + key.toString() + "]");
+			
+			List<Integer> edges = null;
+			int distance = Integer.MAX_VALUE;
+			Node.Color color = Node.Color.WHITE;
+
+			while (values.hasNext()) {
+				Text value = values.next();
+				Node u = new Node(key.get() + "\t" + value.toString());
+
+				// One one copy of the node will be the fully expanded version, which includes the edges
+				if(u.getEdges().size() > 0)
+					edges = u.getEdges();
+				// Save the minimum distance
+				if(u.getDistance() < distance)
+					distance = u.getDistance();
+				// Save the darkest color
+				if(u.getColor().ordinal() > color.ordinal())
+					color = u.getColor();
+			}
+
+			Node n = new Node(key.get());
+			n.setDistance(distance);
+			n.setEdges(edges);
+			n.setColor(color);
+			output.collect(key, new Text(n.getLine()));
+			LOG.info("REDUCE OUTPUTTING FOR FINAL KEY [" + key + "] and value [" + n.getLine() + "]");
 		}
 	}
+
+	/** The main driver for word count map/reduce program. Invoke this method to submit the map/reduce job.
+	     @throws IOException When there is communication problems with the job tracker. */
+	public int run(String[] args) throws Exception {
+		int iterCount = 0;
+		while (iterCount <= 4) {
+			JobConf conf = getJobConf(args);
+			String input = (iterCount == 0) ? "input" : "output-graph-" + iterCount;
+			FileInputFormat.setInputPaths(conf, new Path(input));
+			FileOutputFormat.setOutputPath(conf, new Path("output-graph-" + (iterCount + 1)));
+			RunningJob job = JobClient.runJob(conf);
+			iterCount++;
+		}
+		return 0;
+	}
 	
-	public static class InvIdxReducer extends Reducer<WPairPriority, IntWritable, Text, Text> {
-		String plist = "", lastword = null;
-		
-		protected void reduce(WPairPriority key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
-			if(lastword != null	&& !lastword.equals(key.getWord().toString())) {
-				context.write(new Text(lastword), new Text(plist));
-				plist = "";
-			}
-			plist += ((plist.length() == 0) ? "":";") + key.getFilename() + ":" + values.iterator().next().get();
-			lastword = key.getWord().toString();
+	private JobConf getJobConf(String[] args) {
+		JobConf conf = new JobConf(getConf(), CC99.class);
+		conf.setJobName("graphsearch");
+		conf.setOutputKeyClass(IntWritable.class);
+		conf.setOutputValueClass(Text.class);
+		conf.setMapperClass(MapClass.class);
+		conf.setReducerClass(Reduce.class);
+
+		for (int i = 0; i < args.length; ++i) {
+			if ("-m".equals(args[i]))
+				conf.setNumMapTasks(Integer.parseInt(args[++i]));
+			else if ("-r".equals(args[i]))
+				conf.setNumReduceTasks(Integer.parseInt(args[++i]));
 		}
-		
-		protected void cleanup(Context context) throws IOException, InterruptedException {
-			context.write(new Text(lastword), new Text(plist));
-		}
+		LOG.info("The number of reduce tasks has been set to " + conf.getNumReduceTasks());
+		LOG.info("The number of mapper tasks has been set to " + conf.getNumMapTasks());
+		return conf;
 	}
 	
 	public static void main(String[] args) throws Exception {
-		Job job = initializeJob(args);
-		job.setNumReduceTasks(3);
-		job.setJarByClass(CC99.class);
-		
-		FileInputFormat.addInputPath(job, new Path(args[0]));
-		FileOutputFormat.setOutputPath(job, new Path(args[1]));
-		
-		//MAPPER
-		job.setMapperClass(InvIdxMapper.class);
-		job.setMapOutputKeyClass(WPairPriority.class);
-		job.setMapOutputValueClass(IntWritable.class);
-		
-		//PARTITIONER
-		job.setPartitionerClass(WORDFILEPartitioner.class);
-		
-		//REDUCER/OUTPUT
-		job.setReducerClass(InvIdxReducer.class);
-		job.setOutputKeyClass(Text.class);
-		job.setOutputValueClass(Text.class);
-
-		System.out.println(job.waitForCompletion(true) ? "Job SUCCESS" : "Job FAILED");
-
-		System.exit(0);
+		Configuration conf = new Configuration();
+		deleteOutputFolders(conf);
+		int res = ToolRunner.run(conf, new CC99(), args);
+		combineOutputFolders(conf);
+		System.exit(res);
 	}
 	
-	public static Job initializeJob(String[] args) throws IOException {
-		Configuration conf = new Configuration();
-		String[] otherArgs = new GenericOptionsParser(conf, args).getRemainingArgs();
-		if (otherArgs.length != 2) {
-			System.err.println("Usage: wordcount <in> <out>");
-			System.exit(2);
+	static int printUsage() {
+		System.out.println("graphsearch [-m <num mappers>] [-r <num reducers>]");
+		ToolRunner.printGenericCommandUsage(System.out);
+		return -1;
+	}
+	
+	public static void deleteOutputFolders(Configuration conf) throws IllegalArgumentException, IOException {
+		List<String> folders = Files.list(Paths.get("")).map(x->x.toString()).filter(x->x.startsWith("output")).collect(Collectors.toList());
+		for(String folder : folders)
+			new Path(folder).getFileSystem(conf).delete(new Path(folder), true);
+	}	
+	public static void combineOutputFolders(Configuration conf) throws IOException {
+		List<String> outDirs = Files.list(Paths.get("")).map(x->x.toString()).filter(x->x.startsWith("output-graph")).collect(Collectors.toList());
+		new File("output").mkdir();
+		for(String outDir : outDirs) {
+			List<String> files = Files.list(Paths.get(outDir + "/")).map(x->x.toString()).filter(x->!(x.endsWith("crc")||x.endsWith("SUCCESS"))).collect(Collectors.toList());
+			for(String file : files) {
+				String newName = file.substring(13).replace('\\', '-');
+				Files.copy(new File(file).toPath(), new File("output\\" + newName + ".txt").toPath());
+			}
+			new Path(outDir).getFileSystem(conf).delete(new Path(outDir), true);
 		}
-		new Path(args[1]).getFileSystem(conf).delete(new Path(otherArgs[1]), true);
-		return Job.getInstance(conf, "Inverted Order");
 	}
 }
