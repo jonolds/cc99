@@ -7,7 +7,7 @@ import org.apache.hadoop.io.Text;
 
 public class Node {
 	public static enum Color { WHITE, GRAY, BLACK };
-	private int id, distance;
+	private int id, cost;
 	private List<Integer> edges = new ArrayList<Integer>();
 	private Color color = Color.WHITE;
 
@@ -21,7 +21,7 @@ public class Node {
 		//EDGES
 		Arrays.stream(tokens[0].split(",")).filter(x->x.length()>0).forEach(x->edges.add(Integer.parseInt(x)));
 		//DISTANCE
-		this.distance = (tokens[1].equals("Integer.MAX_VALUE")) ? Integer.MAX_VALUE : Integer.parseInt(tokens[1]);
+		this.cost = (tokens[1].equals("Integer.MAX_VALUE")) ? Integer.MAX_VALUE : Integer.parseInt(tokens[1]);
 		//COLOR
 		this.color = Color.valueOf(tokens[2]);
 	}
@@ -32,8 +32,8 @@ public class Node {
 	public List<Integer> getEdges() { return this.edges; }
 	public void setEdges(List<Integer> edges) { this.edges = edges; }
 	
-	public int getDistance() { return this.distance; }
-	public void setDistance(int distance) { this.distance = distance; }
+	public int getCost() { return this.cost; }
+	public void setCost(int cost) { this.cost = cost; }
 
 	public Color getColor() { return this.color; }
 	public void setColor(Color color) { this.color = color; }
@@ -41,7 +41,7 @@ public class Node {
 	public Text getLine() {
 		StringBuffer s = new StringBuffer();
 		s.append(edges.stream().map(x->x.toString()).collect(Collectors.joining(","))).append("|");
-		s.append(this.distance < Integer.MAX_VALUE ? this.distance : "Integer.MAX_VALUE").append("|");
+		s.append(this.cost < Integer.MAX_VALUE ? this.cost : "Integer.MAX_VALUE").append("|");
 		s.append(color.toString());
 		return new Text(s.toString());
 	}
