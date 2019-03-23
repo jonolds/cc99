@@ -9,7 +9,7 @@ input
 8	9|Integer.MAX_VALUE|WHITE
 9	8|Integer.MAX_VALUE|WHITE
 
-output\1-part-00000.txt
+.\output-graph-1\part-00000
 1	2,6|0|BLACK
 2	3|1|GRAY
 3	4|Integer.MAX_VALUE|WHITE
@@ -20,7 +20,7 @@ output\1-part-00000.txt
 8	9|Integer.MAX_VALUE|WHITE
 9	8|Integer.MAX_VALUE|WHITE
 
-output\2-part-00000.txt
+.\output-graph-2\part-00000
 1	2,6|0|BLACK
 2	3|1|BLACK
 3	4|2|GRAY
@@ -31,7 +31,7 @@ output\2-part-00000.txt
 8	9|Integer.MAX_VALUE|WHITE
 9	8|Integer.MAX_VALUE|WHITE
 
-output\3-part-00000.txt
+.\output-graph-3\part-00000
 1	2,6|0|BLACK
 2	3|1|BLACK
 3	4|2|BLACK
@@ -42,7 +42,7 @@ output\3-part-00000.txt
 8	9|3|GRAY
 9	8|Integer.MAX_VALUE|WHITE
 
-output\4-part-00000.txt
+.\output-graph-4\part-00000
 1	2,6|0|BLACK
 2	3|1|BLACK
 3	4|2|BLACK
@@ -53,7 +53,7 @@ output\4-part-00000.txt
 8	9|3|BLACK
 9	8|4|GRAY
 
-output\5-part-00000.txt
+.\output-graph-5\part-00000
 1	2,6|0|BLACK
 2	3|1|BLACK
 3	4|2|BLACK
@@ -64,18 +64,7 @@ output\5-part-00000.txt
 8	9|3|BLACK
 9	8|4|BLACK
 
-output\6-part-00000.txt
-1	2,6|0|BLACK
-2	3|1|BLACK
-3	4|2|BLACK
-4	5|3|BLACK
-5	6|4|BLACK
-6	7|1|BLACK
-7	8|2|BLACK
-8	9|3|BLACK
-9	8|4|BLACK
-
-output\7-part-00000.txt
+.\output-graph-6\part-00000
 1	2,6|0|BLACK
 2	3|1|BLACK
 3	4|2|BLACK
