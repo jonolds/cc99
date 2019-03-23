@@ -7,7 +7,7 @@ import org.apache.hadoop.io.Text;
 
 enum Color { WHITE, GRAY, BLACK }
 //CC6 Node
-public class Node extends MRHelp {
+public class Node {
 	private int id, cost;
 	private List<Integer> edges = new ArrayList<>(), weights = new ArrayList<>();
 	private Color color = Color.WHITE;
@@ -19,27 +19,18 @@ public class Node extends MRHelp {
 
 		//ID  -  EDGES  -  WEIGHTS  -  COST  -  COLOR
 		this.id = Integer.parseInt(key);
-		Arrays.stream(tokens[0].split(",")).map(x->x.trim()).filter(x->x.length()>0).forEach(x->edges.add(Integer.parseInt(x)));
-		Arrays.stream(tokens[1].split(",")).map(x->x.trim()).filter(x->x.length()>0).forEach(x->weights.add(Integer.parseInt(x)));
-		this.cost = (tokens[2].equals("MX")) ? Integer.MAX_VALUE : Integer.parseInt(tokens[2].trim());
+		Arrays.stream(tokens[0].split(",")).filter(x->x.length()>0).forEach(x->edges.add(Integer.parseInt(x)));
+		Arrays.stream(tokens[1].split(",")).filter(x->x.length()>0).forEach(x->weights.add(Integer.parseInt(x)));
+		this.cost = (tokens[2].equals("Integer.MAX_VALUE")) ? Integer.MAX_VALUE : Integer.parseInt(tokens[2]);
 		this.color = Color.valueOf(tokens[3]);
 	}
-	public Node(int id, List<Integer> edges, List<Integer> weights, int cost, Color color) {
-		this.id = id; this.edges = edges; this.weights = weights; this.cost = cost; this.color = color;
-	}
+
 	public Node(int id) { this.id = id; }
 		
 	public Text getLine() {
-		StringBuffer s = new StringBuffer();
-		
-		String edgeStr = edges.stream().map(x->x.toString()).collect(Collectors.joining(","));
-		s.append(post(edgeStr, 3) + "|");
-		
-		String weightStr = weights.stream().map(x->x.toString()).collect(Collectors.joining(","));
-		s.append(post(weightStr, 4)).append("|");
-		
-		String costStr = this.cost < Integer.MAX_VALUE ? Integer.valueOf(this.cost).toString() : "MX";
-		s.append(post(costStr, 2)).append("|");
+		StringBuffer s = new StringBuffer(edges.stream().map(x->x.toString()).collect(Collectors.joining(",")) + "|");
+		s.append(weights.stream().map(x->x.toString()).collect(Collectors.joining(","))).append("|");
+		s.append(this.cost < Integer.MAX_VALUE ? this.cost : "Integer.MAX_VALUE").append("|");
 		s.append(color.toString());
 		return new Text(s.toString());
 	}	
